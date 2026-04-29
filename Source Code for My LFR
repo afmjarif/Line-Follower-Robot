@@ -1,0 +1,90 @@
+// ===== Line Follower Robot (8 Sensor, PID Control) =====
+// Microcontroller: Arduino Nano
+
+#define NUM_SENSORS 8
+
+// Sensor pins (adjust if needed)
+int sensorPins[NUM_SENSORS] = {A0, A1, A2, A3, A4, A5, 2, 3};
+
+// Motor pins (L298N)
+#define ENA 5
+#define IN1 6
+#define IN2 7
+#define ENB 9
+#define IN3 10
+#define IN4 11
+
+// PID constants (tune these)
+float Kp = 25;
+float Ki = 0;
+float Kd = 15;
+
+int baseSpeed = 150;
+int maxSpeed = 255;
+
+int lastError = 0;
+int integral = 0;
+
+void setup() {
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    pinMode(sensorPins[i], INPUT);
+  }
+
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+}
+
+void loop() {
+  int position = readLine();
+  int error = position - 3500; // center = 3500
+
+  integral += error;
+  int derivative = error - lastError;
+
+  int correction = Kp * error + Ki * integral + Kd * derivative;
+
+  int leftSpeed = baseSpeed + correction;
+  int rightSpeed = baseSpeed - correction;
+
+  leftSpeed = constrain(leftSpeed, 0, maxSpeed);
+  rightSpeed = constrain(rightSpeed, 0, maxSpeed);
+
+  setMotor(leftSpeed, rightSpeed);
+
+  lastError = error;
+}
+
+// ===== Read line position =====
+int readLine() {
+  long weightedSum = 0;
+  int sum = 0;
+
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    int value = digitalRead(sensorPins[i]);
+    value = (value == HIGH) ? 1 : 0;
+
+    weightedSum += (long)value * (i * 1000);
+    sum += value;
+  }
+
+  if (sum == 0) return lastError; // lost line
+
+  return weightedSum / sum;
+}
+
+// ===== Motor control =====
+void setMotor(int leftSpeed, int rightSpeed) {
+  // Left motor
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  analogWrite(ENA, leftSpeed);
+
+  // Right motor
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENB, rightSpeed);
+}
